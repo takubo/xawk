@@ -1,0 +1,4 @@
+END  {
+	for ( ; ;)
+		getline
+}
