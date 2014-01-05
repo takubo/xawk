@@ -7,7 +7,6 @@
 
 #define false	0
 #define true	!false
-#define TOK_NEWLINE	-2
 #define EOP	-3
 #define streq(s, t)	(!strcmp((s), (t)))
 #define strneq(s, t)	(strcmp((s), (t)))
@@ -135,11 +134,12 @@ enum token_val {
 	TOK_LBRCKT,
 	TOK_RBRCKT,
 	TOK_CMMA,
-	TOK_CLLON,
+	TOK_COLON,
 	TOK_QUEST,
 	TOK_PIPE,
 	TOK_DOLLAR,
-	TOK_SEMICLLON,
+	TOK_SEMICOLON,
+	TOK_NEWLINE,
 
 	//要素
 	TOK_IDENTIFIER,
@@ -267,6 +267,7 @@ char *token_string[] = {
 	"|",
 	"$",
 	";",
+	"NEWLINE",
 
 	//要素
 	"IDENTIFIER",
@@ -447,6 +448,7 @@ get_disit(struct lex_buf *buf)
 	int c;
 	char tmp_str[1024];
 	int ptr = 0;
+	char *end;
 	int base;
 
 	base = 10;
@@ -494,9 +496,20 @@ get_disit(struct lex_buf *buf)
 		}
 	}
 
-	if ((base == 8 || base == 10) && (c == 'e' || c == 'E')) {
+	if (base == 16 && c == '.') {
+		// 小数
+		tmp_str[ptr++] = (char) c;
+
+		while (isxdigit(c = getch(buf))) {
+			tmp_str[ptr++] = (char) c;
+		}
+	}
+
+	if (((base == 8 || base == 10) && (c == 'e' || c == 'E')) ||
+		(base == 16 && (c == 'p' || c == 'P'))) {
 		// 指数形式
-		base = 10;
+		if (base == 8)
+			base = 10;
 		tmp_str[ptr++] = (char) c;
 
 		c = getch(buf);
@@ -514,10 +527,9 @@ get_disit(struct lex_buf *buf)
 	tmp_str[ptr++] = '\0';
 	ungetch(buf);
 
-	if (base == 10) {
-		buf->token.val.real = atof(tmp_str);
+	if (base == 10 || base == 16) {
+		buf->token.val.real = strtod(tmp_str, &end);
 	} else {
-		char *end;
 		buf->token.val.real = strtol(tmp_str, &end, base);
 		if (*end != '\0') return -1;
 	}
@@ -566,9 +578,13 @@ next:
 		goto next;
 		break;
 	case '\r':
+		if ((c = getch(buf)) != '\n')
+			ungetch(buf);
 	case '\n':
-	case ';':
 		tok = TOK_NEWLINE;	// End of Statement
+		break;
+	case ';':
+		tok = TOK_SEMICOLON;
 		break;
 	case EOF:
 		ret = EOP;		// End of Program
@@ -689,7 +705,7 @@ next:
 		tok = TOK_QUEST;
 		break;
 	case ':':
-		tok = TOK_CLLON;
+		tok = TOK_COLON;
 		break;
 	case '$':
 		tok = TOK_DOLLAR;
@@ -936,7 +952,7 @@ main(int argc, char **argv)
 				enum token_val tok = buf.token.tok;
 				switch (tok) {
 				case TOK_NEWLINE:
-					puts("EOS");
+					printf("<%s>\n", token_string[tok]);
 					break;
 				case TOK_STRING:
 					printf("\"%s\"\n", buf.token.val.str);
@@ -966,7 +982,7 @@ main(int argc, char **argv)
 
 	}
 
-	free(buf.src_files[i]);
+	// free(buf.src_files[i]);
 	return 0;
 }
 
