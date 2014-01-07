@@ -4,7 +4,7 @@ xawk
 An implementation of AWK.
 
 
-Features
+Features:
 
  Suppot multibytes character.
 
