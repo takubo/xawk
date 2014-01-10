@@ -69,7 +69,7 @@ enum token_val {
 	TOK_BF_MATCH,
 	TOK_BF_RAND,
 	TOK_BF_SIN,
-	TOK_BF_SPRIT,
+	TOK_BF_SPLIT,
 	TOK_BF_SPRINTF,
 	TOK_BF_SQRT,
 	TOK_BF_SRAND,
@@ -198,7 +198,7 @@ char *token_string[] = {
 	"match",
 	"rand",
 	"sin",
-	"sprit",
+	"split",
 	"sprintf",
 	"sqrt",
 	"srand",
@@ -435,7 +435,7 @@ get_regexp(struct lex_buf *buf)
 	return -1;
 }
 
-#define isodisit(c)	(((c) == '0') || \
+#define isodigit(c)	(((c) == '0') || \
 			 ((c) == '1') || \
 			 ((c) == '2') || \
 			 ((c) == '3') || \
@@ -445,17 +445,22 @@ get_regexp(struct lex_buf *buf)
 			 ((c) == '7'))
 
 int
-get_disit(struct lex_buf *buf)
+get_digit(struct lex_buf *buf)
 {
 	int c;
 	char tmp_str[1024];
 	int ptr = 0;
 	char *end;
 	int base;
+#ifdef SUPPORT_OCATAL_CONSTANT
+	int exist89 = false;
+#endif
 
 	base = 10;
 	if ((c = getch(buf)) == '0') {
+#ifdef SUPPORT_OCATAL_CONSTANT
 		base = 8;
+#endif
 		tmp_str[ptr++] = (char) c;
 
 		c = getch(buf);
@@ -483,6 +488,11 @@ get_disit(struct lex_buf *buf)
 		}
 	} else {
 		while (isdigit(c)) {
+#ifdef SUPPORT_OCATAL_CONSTANT
+			if (c == '8' || c == '9') {
+				exist89 = true;
+			}
+#endif
 			tmp_str[ptr++] = (char) c;
 			c = getch(buf);
 		}
@@ -490,7 +500,9 @@ get_disit(struct lex_buf *buf)
 
 	if ((base == 8 || base == 10) && c == '.') {
 		// 小数
+#ifdef SUPPORT_OCATAL_CONSTANT
 		base = 10;
+#endif
 		tmp_str[ptr++] = (char) c;
 
 		while (isdigit(c = getch(buf))) {
@@ -510,8 +522,10 @@ get_disit(struct lex_buf *buf)
 	if (((base == 8 || base == 10) && (c == 'e' || c == 'E')) ||
 		(base == 16 && (c == 'p' || c == 'P'))) {
 		// 指数形式
+#ifdef SUPPORT_OCATAL_CONSTANT
 		if (base == 8)
 			base = 10;
+#endif
 		tmp_str[ptr++] = (char) c;
 
 		c = getch(buf);
@@ -531,6 +545,10 @@ get_disit(struct lex_buf *buf)
 
 	if (base == 10 || base == 16) {
 		buf->token.val.real = strtod(tmp_str, &end);
+#ifdef SUPPORT_OCATAL_CONSTANT
+	} else if (base == 8 && exist89) {
+		return -1;
+#endif
 	} else {
 		buf->token.val.real = strtol(tmp_str, &end, base);
 		if (*end != '\0') return -1;
@@ -826,7 +844,7 @@ next:
 		if (isdigit(c)) {
 	case '.':
 			ungetch(buf);
-			if ((ret = get_disit(buf)) == 0) {
+			if ((ret = get_digit(buf)) == 0) {
 				tok = TOK_NUMBER;
 			}
 		} else if (isalpha(c) || c == '_') {
@@ -945,11 +963,11 @@ main(int argc, char **argv)
 		for ( ; ; ) {
 			int ret = lexer(&buf);
 			if (ret == EOP) {
-				puts("EOP");
+				puts("<EOP>");
 				break;
 			} else if (ret < 0) {
-				printf("%s\n", "error");
-				break;
+				printf("%s\n", "<error>");
+				// break;
 			} else {
 				enum token_val tok = buf.token.tok;
 				switch (tok) {
