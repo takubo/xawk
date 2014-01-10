@@ -339,8 +339,62 @@ skip_comment(struct lex_buf *buf)
 	return c;
 }
 
+#define isodigit(c)	(((c) == '0') || \
+			 ((c) == '1') || \
+			 ((c) == '2') || \
+			 ((c) == '3') || \
+			 ((c) == '4') || \
+			 ((c) == '5') || \
+			 ((c) == '6') || \
+			 ((c) == '7'))
+
+#define c2n(c)	((c) - '0')
+#define c2x(c)	(((c) <= '9') ? ((c) - '0') : ((c) <= 'F') ? ((c) - '@' + 9) : ((c) - '`' + 9))
+
+typedef unsigned int uint32;
+typedef unsigned char byte_t;
+
+union unv_chr_name {
+	uint32 code;
+	byte_t byte[4];
+};
+
 int
-get_string(struct lex_buf *buf)
+ucn2utf8(union unv_chr_name tmp, char *str)
+{
+	int bytes = -1;
+
+	if (0x0000 <= tmp.code && tmp.code <= 0x007F) {
+		*str = tmp.code;
+		bytes = 1;
+	} else if (0x0080 <= tmp.code && tmp.code <= 0x07FF) {
+		*str++ = 0xc0 | ((tmp.code >> 6) & 0x1e) | ((tmp.code >> 6) & 0x01);
+		*str   = 0x80 | (tmp.code & 0x3f);
+		bytes = 2;
+	} else if (0x0800 <= tmp.code && tmp.code <= 0xFFFF) {
+		*str++ = 0xe0 | ((tmp.code >> 12) & 0x0f);
+		*str++ = 0x80 | ((tmp.code >> 11) & 0x20) | ((tmp.code >> 6) & 0x1f);
+		*str   = 0x80 | (tmp.code & 0x3f);
+		bytes = 3;
+	} else if (0x10000 <= tmp.code && tmp.code <= 0x10FFFF) {
+		*str++ = 0xf0 | ((tmp.code >> 18) & 0x07);
+		*str++ = 0x80 | ((tmp.code >> 16) & 0x30) | ((tmp.code >> 12) & 0x0f);
+		*str++ = 0x80 | ((tmp.code >> 11) & 0x20) | ((tmp.code >> 6) & 0x1f);
+		*str   = 0x80 | (tmp.code & 0x3f);
+		bytes = 4;
+#if 0
+	} else if (0x20000u <= tmp.code && tmp.code <= 0x3FFFFFu) {
+		bytes = 4;
+	} else if (0x4000000u <= tmp.code && tmp.code <= 0x7FFFFFFFu) {
+		bytes = 4;
+#endif
+	}
+
+	return bytes;
+}
+
+int
+get_string(struct lex_buf *buf, char terminater)
 {
 	int c;
 	int i = 0;
@@ -348,31 +402,121 @@ get_string(struct lex_buf *buf)
 	for ( ; ; ) {
 		switch (c = getch(buf)) {
 		case '\0':
+		case '\r':
 		case '\n':
 		case EOF:
-			// 文字列が終端していないのに、行末に達した。
-			puts("String terminate with no double quotation.");
+			// 文字列/正規表現が終端していないのに、行末に達した。
+			if (terminater == '"') {
+				puts("String terminate with no double quotation.");
+			} else if (terminater == '"') {
+				puts("Regexp terminate with no slash.");
+			}
 			ungetch(buf);
 			return -1;
 			break;
 		case '"':
-			lex_str[i] = (char)'\0';
-			return 0;
+		case '/':
+			if (c == terminater) {
+				lex_str[i] = (char)'\0';
+				return 0;
+			} else {
+				lex_str[i] = (char)'\0';
+			}
 			break;
 		case '\\':
 			switch (c = getch(buf)) {
 			case '"':
 				lex_str[i++] = (char)'"';
 				break;
+			case '/':
+				lex_str[i++] = (char)'/';
+				break;
 			case '\\':
 				lex_str[i++] = (char)'\\';
 				break;
-			case 't':
-				lex_str[i++] = (char)'\t';
+			case 'a':
+				lex_str[i++] = (char)'\a';
+				break;
+			case 'b':
+				lex_str[i++] = (char)'\b';
+				break;
+			case 'f':
+				lex_str[i++] = (char)'\f';
 				break;
 			case 'n':
 				lex_str[i++] = (char)'\n';
 				break;
+			case 'r':
+				lex_str[i++] = (char)'\r';
+				break;
+			case 't':
+				lex_str[i++] = (char)'\t';
+				break;
+			case 'v':
+				lex_str[i++] = (char)'\v';
+				break;
+			case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': // \o \oo \ooo
+				lex_str[i] = c2n(c);
+				c = getch(buf);
+				if (isodigit(c)) {
+					lex_str[i] = lex_str[i] * 8 + c2n(c);
+					c = getch(buf);
+					if (isodigit(c)) {
+						lex_str[i] = lex_str[i] * 8 + c2n(c);
+						c = getch(buf);	// for ungetch
+					}
+				}
+				ungetch(buf);
+				i++;
+				break;
+#ifndef POSIX
+			case 'x': // \xhhhh
+				if (! posix) {
+					lex_str[i] = 0;
+					for (; isxdigit(c = getch(buf)); ) {
+						lex_str[i] = lex_str[i] * 16 + c2x(c);
+					}
+					ungetch(buf);
+					i++;
+				} else {
+					lex_str[i++] = (char)c;
+				}
+				break;
+			case 'u': // \u
+			case 'U': // \U
+				if (! posix) {
+					union unv_chr_name tmp;
+					int utf8_bytes;
+
+					tmp.code = 0;
+					for (; isxdigit(c = getch(buf)); ) {
+						tmp.code = tmp.code * 16 + c2x(c);
+					}
+					ungetch(buf);
+					// TODO++
+					if ((utf8_bytes = ucn2utf8(tmp, &lex_str[i])) < 0) {
+						printf("VVV %x  %d\n", tmp.code, utf8_bytes);
+						puts("invalid unversal character name.");
+						return -1;
+					}
+					i += utf8_bytes;
+					printf("UUU %x  %d\n", tmp.code, utf8_bytes);
+					printf("=%s %s %s %s %s %s\n", &lex_str[i - 6], &lex_str[i - 5], &lex_str[i - 4], &lex_str[i - 3], &lex_str[i - 2], &lex_str[i - 1]);
+					printf("=%x %x %x %x %x %x\n", lex_str[i - 6], lex_str[i - 5], lex_str[i - 4], lex_str[i - 3], lex_str[i - 2], lex_str[i - 1]);
+					// TODO--
+				} else {
+					lex_str[i++] = (char)c;
+				}
+				break;
+			case 'q':
+				if (! posix) lex_str[i++] = (char)'\'';
+				else        lex_str[i++] = (char)c;
+				break;
+			case 'e':
+				if (! posix) lex_str[i++] = (char)0x1b;	// \033 // "\e" is compatible echo in sh
+				else        lex_str[i++] = (char)c;
+				break;
+#endif
 			default:
 				lex_str[i++] = (char)c;
 				break;
@@ -386,6 +530,10 @@ get_string(struct lex_buf *buf)
 	return -1;
 }
 
+#if 1
+#define lex_string(buf)	get_string(buf, '"')
+#define lex_regexp(buf)	get_string(buf, '/')
+#else
 int
 get_regexp(struct lex_buf *buf)
 {
@@ -420,8 +568,10 @@ get_regexp(struct lex_buf *buf)
 			case 'n':
 				lex_str[i++] = (char)'\n';
 				break;
+#if 0
 			case '\n':
 				break;
+#endif
 			default:
 				lex_str[i++] = (char)c;
 				break;
@@ -434,15 +584,7 @@ get_regexp(struct lex_buf *buf)
 	}
 	return -1;
 }
-
-#define isodigit(c)	(((c) == '0') || \
-			 ((c) == '1') || \
-			 ((c) == '2') || \
-			 ((c) == '3') || \
-			 ((c) == '4') || \
-			 ((c) == '5') || \
-			 ((c) == '6') || \
-			 ((c) == '7'))
+#endif
 
 int
 get_digit(struct lex_buf *buf)
@@ -554,7 +696,7 @@ get_digit(struct lex_buf *buf)
 		if (*end != '\0') return -1;
 	}
 
-	return 0;
+	return base;
 }
 
 int
@@ -690,7 +832,7 @@ next:
 				tok = TOK_DIV;
 				break;
 			}
-		} else if (get_regexp(buf) == 0) {
+		} else if (lex_regexp(buf) == 0) {
 			buf->token.val.str = lex_str;
 			tok = TOK_ERE;
 		} else {
@@ -833,7 +975,7 @@ next:
 		}
 		break;
 	case '"':
-		if (get_string(buf) == 0) {
+		if (lex_string(buf) == 0) {
 			buf->token.val.str = lex_str;
 			tok = TOK_STRING;
 		} else {
@@ -844,7 +986,7 @@ next:
 		if (isdigit(c)) {
 	case '.':
 			ungetch(buf);
-			if ((ret = get_digit(buf)) == 0) {
+			if ((ret = get_digit(buf)) >= 0) {
 				tok = TOK_NUMBER;
 			}
 		} else if (isalpha(c) || c == '_') {
