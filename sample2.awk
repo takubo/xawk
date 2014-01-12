@@ -6,6 +6,6 @@ END {
 	m = 017
 	m = 019
 
-	str = "\a\r\qあ表"
-	/Z\x61%/ "B\010E" "\u61\ua3\u2460" # TODO UTF8 4byte のテスト
+	str = "\t\r\qあ表"
+	/Z\x61%/ "B\010E" "a\u61£\ua3①\u2460𨏍\u283cd"
 }

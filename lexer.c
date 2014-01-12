@@ -288,6 +288,7 @@ struct lex_buf {
 	char *src_files[MAX_SRC_FILE_NUM];
 	// int src_files_size;
 	FILE *src;
+	int encoding;
 	enum slash_interp_mode slash;
 	struct {
 		enum token_val tok;
@@ -352,42 +353,30 @@ skip_comment(struct lex_buf *buf)
 #define c2x(c)	(((c) <= '9') ? ((c) - '0') : ((c) <= 'F') ? ((c) - '@' + 9) : ((c) - '`' + 9))
 
 typedef unsigned int uint32;
-typedef unsigned char byte_t;
-
-union unv_chr_name {
-	uint32 code;
-	byte_t byte[4];
-};
 
 int
-ucn2utf8(union unv_chr_name tmp, char *str)
+ucn2utf8(uint32 unicode, char *buf)
 {
 	int bytes = -1;
 
-	if (0x0000 <= tmp.code && tmp.code <= 0x007F) {
-		*str = tmp.code;
+	if (0x0000 <= unicode && unicode <= 0x007F) {
+		*buf = unicode;
 		bytes = 1;
-	} else if (0x0080 <= tmp.code && tmp.code <= 0x07FF) {
-		*str++ = 0xc0 | ((tmp.code >> 6) & 0x1e) | ((tmp.code >> 6) & 0x01);
-		*str   = 0x80 | (tmp.code & 0x3f);
+	} else if (0x0080 <= unicode && unicode <= 0x07FF) {
+		*buf++ = 0xc0 | ((unicode >> 6) & 0x1f);
+		*buf   = 0x80 | (unicode & 0x3f);
 		bytes = 2;
-	} else if (0x0800 <= tmp.code && tmp.code <= 0xFFFF) {
-		*str++ = 0xe0 | ((tmp.code >> 12) & 0x0f);
-		*str++ = 0x80 | ((tmp.code >> 11) & 0x20) | ((tmp.code >> 6) & 0x1f);
-		*str   = 0x80 | (tmp.code & 0x3f);
+	} else if (0x0800 <= unicode && unicode <= 0xFFFF) {
+		*buf++ = 0xe0 | ((unicode >> 12) & 0x0f);
+		*buf++ = 0x80 | ((unicode >> 6) & 0x3f);
+		*buf   = 0x80 | (unicode & 0x3f);
 		bytes = 3;
-	} else if (0x10000 <= tmp.code && tmp.code <= 0x10FFFF) {
-		*str++ = 0xf0 | ((tmp.code >> 18) & 0x07);
-		*str++ = 0x80 | ((tmp.code >> 16) & 0x30) | ((tmp.code >> 12) & 0x0f);
-		*str++ = 0x80 | ((tmp.code >> 11) & 0x20) | ((tmp.code >> 6) & 0x1f);
-		*str   = 0x80 | (tmp.code & 0x3f);
+	} else if (0x10000 <= unicode && unicode <= 0x10FFFF) {
+		*buf++ = 0xf0 | ((unicode >> 18) & 0x07);
+		*buf++ = 0x80 | ((unicode >> 12) & 0x3f);
+		*buf++ = 0x80 | ((unicode >> 6) & 0x3f);
+		*buf   = 0x80 | (unicode & 0x3f);
 		bytes = 4;
-#if 0
-	} else if (0x20000u <= tmp.code && tmp.code <= 0x3FFFFFu) {
-		bytes = 4;
-	} else if (0x4000000u <= tmp.code && tmp.code <= 0x7FFFFFFFu) {
-		bytes = 4;
-#endif
 	}
 
 	return bytes;
@@ -485,25 +474,20 @@ get_string(struct lex_buf *buf, char terminater)
 			case 'u': // \u
 			case 'U': // \U
 				if (! posix) {
-					union unv_chr_name tmp;
+					uint32 unicode;
 					int utf8_bytes;
 
-					tmp.code = 0;
+					unicode = 0;
 					for (; isxdigit(c = getch(buf)); ) {
-						tmp.code = tmp.code * 16 + c2x(c);
+						unicode = unicode * 16 + c2x(c);
 					}
 					ungetch(buf);
-					// TODO++
-					if ((utf8_bytes = ucn2utf8(tmp, &lex_str[i])) < 0) {
-						printf("VVV %x  %d\n", tmp.code, utf8_bytes);
+					if ((utf8_bytes = ucn2utf8(unicode, &lex_str[i])) < 0) {
+						printf("VVV %x  %d\n", unicode, utf8_bytes);
 						puts("invalid unversal character name.");
 						return -1;
 					}
 					i += utf8_bytes;
-					printf("UUU %x  %d\n", tmp.code, utf8_bytes);
-					printf("=%s %s %s %s %s %s\n", &lex_str[i - 6], &lex_str[i - 5], &lex_str[i - 4], &lex_str[i - 3], &lex_str[i - 2], &lex_str[i - 1]);
-					printf("=%x %x %x %x %x %x\n", lex_str[i - 6], lex_str[i - 5], lex_str[i - 4], lex_str[i - 3], lex_str[i - 2], lex_str[i - 1]);
-					// TODO--
 				} else {
 					lex_str[i++] = (char)c;
 				}
