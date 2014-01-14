@@ -6,15 +6,16 @@ An implementation of AWK.
 
 Features:
 
- Suppot multibytes character.
+	Suppot various character code including multibytes character.
 
- Support hexadecimal floating point constant, and binary integer constant.
+	BSD 2-Clause license.
 
- Support binary integer constant, seem gcc format.
+	Support hexadecimal floating point constant, specified in POSIX as optional.
 
- Add following special patterns:
-	INIT
-	BEGINFILE
-	ENDFILE
-	FINAL
+	Support binary integer constant, same gcc format.
 
+	Add following special patterns:
+		INIT
+		BEGINFILE
+		ENDFILE
+		FINAL
