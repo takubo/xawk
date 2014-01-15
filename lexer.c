@@ -401,7 +401,7 @@ get_string(struct lex_buf *buf, char terminater)
 	
 	for ( ; ; ) {
 		switch (c = getch(buf)) {
-		case '\0':
+//		case '\0':
 		case '\r':
 		case '\n':
 		case EOF:
@@ -472,12 +472,37 @@ get_string(struct lex_buf *buf, char terminater)
 #ifndef POSIX
 			case 'x': // \xhhhh
 				if (! posix) {
-					lex_str[i] = 0;
-					for (; isxdigit(c = getch(buf)); ) {
-						lex_str[i] = lex_str[i] * 16 + c2x(c);
+					uint32 tmp;
+					int keta;
+
+					for (tmp = 0, keta = 0; isxdigit(c = getch(buf)); keta++) {
+						tmp = tmp * 16 + c2x(c);
 					}
 					ungetch(buf);
-					i++;
+
+					keta = (keta + 1) / 2;
+#if 0
+					int j;
+printf("i= %d %x\n", i, tmp);
+					for (j = 1; j <= keta; j++) {
+						lex_str[i + keta - j] = tmp % 0x100;
+						tmp = tmp / 0x100;
+printf("i=%d %x\n", i + keta - j, lex_str[i + keta - j]);
+					}
+					i += keta;
+#else
+					i += keta;
+printf("tmp= %d %d %x\n", i, keta, tmp);
+					for (; keta > 0; keta--) {
+printf("pre=%x\n", tmp >> ((keta - 1) * 8));
+						lex_str[i - keta] = (tmp >> ((keta - 1) * 8)) & 0xff;
+#if 0
+						lex_str[i - keta] = tmp % 0x100;
+						tmp = tmp / 0x100;
+#endif
+printf("lex=%d %x\n", i - keta, lex_str[i - keta]);
+					}
+#endif
 				} else {
 					lex_str[i++] = (char)c;
 				}

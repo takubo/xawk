@@ -8,4 +8,6 @@ END {
 
 	str = "\a\r\qあ表"
 	/Z\x61%/ "B\010E" "\u61\ua3\u2460" # TODO UTF8 4byte のテスト
+	"ABC\xc2a3" "DEF\xE291A0"
+	"☀☁☂☃"
 }
