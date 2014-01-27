@@ -116,6 +116,7 @@ enum token_val {
 	TOK_NOT,
 	TOK_AND,
 	TOK_OR,
+	TOK_XOR,
 
 	//比較演算子
 	TOK_EQL,
@@ -246,6 +247,7 @@ char *token_string[] = {
 	"!",
 	"&&",
 	"||",
+	"^^",
 
 	//比較演算子
 	"==",
@@ -851,6 +853,11 @@ next:
 		case '=':
 			tok = TOK_POW2_ASSIGN;
 			break;
+#ifndef POSIX
+		case '^':
+			tok = TOK_XOR;
+			break;
+#endif
 		default:
 			ungetch(buf);
 			tok = TOK_POW2;
