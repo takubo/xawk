@@ -47,6 +47,7 @@ enum token_val {
 	TOK_KW_NEXTFILE,
 #endif
 #ifndef POSIX
+	TOK_KW_ABORT,
 	TOK_KW_BEGINFILE,
 	TOK_KW_CASE,
 	TOK_KW_DEFAULT,
@@ -178,6 +179,7 @@ char *token_string[] = {
 	"nextfile",
 #endif
 #ifndef POSIX
+	"abort",
 	"BEGINFILE",
 	"case",
 	"default",
