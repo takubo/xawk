@@ -1,0 +1,124 @@
+neg
+add
+sub
+mul
+div
+mod
+pow
+cat
+mov
+
+and
+or
+xor
+not
+
+cmp_s
+eq_s
+neq_s
+gt_s
+lt_s
+ge_s
+le_s
+
+cmp_n
+eq_n
+neq_n
+gt_n
+lt_n
+ge_n
+le_n
+
+call
+ret
+jmp
+jmt
+jmf
+
+callx
+
+print
+printf
+getline
+
+bfcall
+exit
+nop
+
+break
+
+f_atan2
+f_close 
+f_cos
+f_exp
+f_gsub
+f_index
+f_int
+f_length
+f_log
+f_match
+f_rand
+f_sin
+f_sprit
+f_sprintf
+f_sqrt
+f_srand
+f_sub
+f_substr
+f_system
+f_tolower
+f_toupper
+f_fflush
+f_and
+f_compl
+f_lshift
+f_or
+f_rshift
+f_xor
+
+switch
+
+
+struct resister {
+	union {
+		void *ptr;
+		double num;
+	} val;
+}
+
+
+
+リテラル実数		レジスタ直接値		オペランド値埋め込み
+リテラル文字列		レジスタ直接ポインタ	オペランド値埋め込み
+
+テンポラリ実数		レジスタ直接値
+テンポラリ文字列	レジスタ直接ポインタ
+
+グローバル実数変数	レジスタ直接値
+グローバル文字列変数	レジスタ直接ポインタ
+
+ローカル実数変数	間接レジスタ直接値
+ローカル文字列変数	間接レジスタ直接ポインタ
+
+グローバル実数配列	レジスタ直接ポインタ
+グローバル文字列配列	レジスタ直接ポインタ
+
+ローカル実数配列	レジスタ直接ポインタ
+ローカル文字列配列	レジスタ直接ポインタ
+
+飛び先			レジスタ直接値		オペランド値埋め込み
+
+
+レジスタグループ
+	定数
+	定数(飛び先)
+	グローバル
+	テンポラリ
+	ローカル
+
+
+レジスタunion
+	即値
+	ポインタ
+	
+
