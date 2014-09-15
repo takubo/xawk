@@ -124,12 +124,14 @@ a  = $1 + $2
 
 a = b * c + (d * e) * (f * g)
 
-$1 = b  * c
-$2 = d  * e
-$3 = f  * g
-$2 = $2 * $3
-a  = $1 + $2
+$1 = b  * c	// 1(8) + 3 * 8
+$2 = d  * e	// 1(8) + 3 * 8
+$3 = f  * g	// 1(8) + 3 * 8
+$2 = $2 * $3	// 1(8) + 3 * 8
+a  = $1 + $2	// 1(8) + 3 * 8
 
+// Total (1 + 3 * 8) * 5 = 125
+// Total 4 * 8 * 5 = 160
 
 
 
@@ -172,33 +174,35 @@ pop a
 
 a = b * c + (d * e) * (f * g)
 
-push a
-push b
-push c
-mul
-push d
-push e
-mul
-push f
-push g
-mul
-mul
-add
-mov
+push a		// 1 + 8
+push b		// 1 + 8
+push c		// 1 + 8
+mul		// 1
+push d		// 1 + 8
+push e		// 1 + 8
+mul		// 1
+push f		// 1 + 8
+push g		// 1 + 8
+mul		// 1
+mul		// 1
+add		// 1
+mov		// 1
 
-push b
-push c
-mul
-push d
-push e
-mul
-push f
-push g
-mul
-mul
-add
-pop a
+push b		// 1 + 8
+push c		// 1 + 8
+mul		// 1
+push d		// 1 + 8
+push e		// 1 + 8
+mul		// 1
+push f		// 1 + 8
+push g		// 1 + 8
+mul		// 1
+mul		// 1
+add		// 1
+pop a		// 1 + 8
 
+// Total 12 + 7 * 8 = 68
+// Total 12 * 8 + 7 * 8 = 152
 
 
 
